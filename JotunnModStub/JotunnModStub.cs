@@ -1,5 +1,7 @@
 ﻿using BepInEx;
 using BepInEx.Configuration;
+using HarmonyLib;
+using JetBrains.Annotations;
 using Jotunn;
 using Jotunn.Configs;
 using Jotunn.Entities;
@@ -7,6 +9,11 @@ using Jotunn.Managers;
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Http;
+using System.Security.Policy;
+using System.Threading.Tasks;
 using UnityEngine;
 using Logger = Jotunn.Logger;
 
@@ -25,41 +32,18 @@ namespace JotunnModStub
         // https://valheim-modding.github.io/Jotunn/tutorials/localization.html
         public static CustomLocalization Localization = LocalizationManager.Instance.GetLocalization();
 
-        private string url = "192.168.0.206/resist";
-        private ButtonConfig ShockButton;
+        private Harmony harmony;
 
         private void Awake()
         {
-            // Jotunn comes with its own Logger class to provide a consistent Log style for all mods using it
-            Jotunn.Logger.LogInfo("ModStub has landed");
-
             PrefabManager.OnVanillaPrefabsAvailable += AddClonedItems;
-            AddInputs();
-
-            Localization.AddTranslation("English", new Dictionary<string, string>
-            {
-                {"item_evilsword", "Sword of Cum"}, {"item_evilsword_desc", "Bringing the cum"},
-                {"shock_message", "i hate you and ill cum on you"},
-            });
-
-            Localization.AddTranslation("English", new Dictionary<string, string>
-            {
-                {"item_evilsword", "Sword of Darkness"}, {"item_evilsword_desc", "Bringing the light"},
-                {"evilsword_shwing", "Woooosh"}, {"evilsword_scroll", "*scroll*"},
-                {"evilsword_effectname", "Evil"}, {"evilsword_effectstart", "You feel evil"},
-                {"evilsword_effectstop", "You feel nice again"}
-            });
+            harmony = new Harmony(Info.Metadata.GUID);
+            harmony.PatchAll();
         }
 
         private void Update()
         {
-            if(ZInput.instance != null)
-            {
-                if (ZInput.GetButton(ShockButton.Name) && MessageHud.instance.m_msgQeue.Count == 0)
-                {
-                    MessageHud.instance.ShowMessage(MessageHud.MessageType.Center, "oh fuck ive cummed my pantaloons :(");
-                }
-            }
+            
         }
 
         private void AddClonedItems()
@@ -78,17 +62,35 @@ namespace JotunnModStub
             // You want that to run only once, Jotunn has the item cached for the game session
             PrefabManager.OnVanillaPrefabsAvailable -= AddClonedItems;
         }
+    }
 
-        private void AddInputs()
+    [HarmonyPatch(typeof(Character), nameof(Character.ApplyDamage))]
+    static class Damage_Patch
+    {
+        private static string url = "http://192.168.0.197/resist";
+        
+        static void Prefix(Character __instance, ref HitData hit)
         {
-            ShockButton = new ButtonConfig
+            if (__instance.Equals(Player.m_localPlayer))
             {
-                Name = "JotunnExampleMod_RaiseSkill",
-                Key = KeyCode.RightControl,
-                ActiveInGUI = true,    // Enable this button in vanilla GUI (e.g. the console)
-                ActiveInCustomGUI = true  // Enable this button in custom GUI
-            };
-            InputManager.Instance.AddButton(PluginGUID, ShockButton);
+                float damage = hit.GetTotalDamage();
+                double val = Math.Min(damage*10, 1500);
+
+                if(Player.m_localPlayer.GetHealth() - damage <= 0f)
+                {
+                    val = 1500;
+                }
+
+                SendShock(val);
+            }
+        }
+
+        static async void SendShock(double val)
+        {
+            using (var client = new HttpClient())
+            {
+                var result = await client.GetStringAsync(url + "?val=" + val);
+            }
         }
     }
 }
