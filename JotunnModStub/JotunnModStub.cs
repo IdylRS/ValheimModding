@@ -6,14 +6,6 @@ using Jotunn;
 using Jotunn.Configs;
 using Jotunn.Entities;
 using Jotunn.Managers;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
-using System.Net;
-using System.Net.Http;
-using System.Security.Policy;
-using System.Threading.Tasks;
 using UnityEngine;
 using Logger = Jotunn.Logger;
 
@@ -36,7 +28,7 @@ namespace JotunnModStub
 
         private void Awake()
         {
-            PrefabManager.OnVanillaPrefabsAvailable += AddClonedItems;
+            // PrefabManager.OnVanillaPrefabsAvailable += AddClonedItems;
             harmony = new Harmony(Info.Metadata.GUID);
             harmony.PatchAll();
         }
@@ -67,29 +59,11 @@ namespace JotunnModStub
     [HarmonyPatch(typeof(Character), nameof(Character.ApplyDamage))]
     static class Damage_Patch
     {
-        private static string url = "http://192.168.0.197/resist";
-        
         static void Prefix(Character __instance, ref HitData hit)
         {
             if (__instance.Equals(Player.m_localPlayer))
             {
-                float damage = hit.GetTotalDamage();
-                double val = Math.Min(damage*10, 1500);
-
-                if(Player.m_localPlayer.GetHealth() - damage <= 0f)
-                {
-                    val = 1500;
-                }
-
-                SendShock(val);
-            }
-        }
-
-        static async void SendShock(double val)
-        {
-            using (var client = new HttpClient())
-            {
-                var result = await client.GetStringAsync(url + "?val=" + val);
+                Logger.LogDebug("Took damage: " + hit.GetTotalDamage());
             }
         }
     }
